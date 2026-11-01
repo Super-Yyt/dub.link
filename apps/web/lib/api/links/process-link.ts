@@ -215,6 +215,7 @@ export async function processLink<T extends Record<string, any>>({
     if (
       key !== "_root" &&
       allowedHostnames &&
+      allowedHostnames.length > 0 &&
       !allowedHostnames.includes(urlDomain) &&
       !allowedHostnames.includes(apexDomain)
     ) {

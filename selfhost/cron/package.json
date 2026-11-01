@@ -1,0 +1,11 @@
+{
+  "name": "dub-selfhost-cron",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Cron scheduler for self-hosted Dub (replaces Vercel Cron)",
+  "type": "module",
+  "main": "src/index.mjs",
+  "scripts": {
+    "start": "node src/index.mjs"
+  }
+}

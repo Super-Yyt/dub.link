@@ -53,3 +53,10 @@ playwright-report/
 test-results/
 blob-report/
 .pnpm-store
+
+# selfhost local artifacts
+.pnpm-store/
+.docker-config/
+selfhost/.sdk-sources/
+selfhost/tinybird/test-template.mjs
+.env.selfhost

@@ -1,0 +1,11 @@
+{
+  "name": "dub-selfhost-qstash",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Self-hosted QStash-compatible message queue for Dub",
+  "type": "module",
+  "main": "src/index.mjs",
+  "scripts": {
+    "start": "node src/index.mjs"
+  }
+}

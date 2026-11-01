@@ -12,7 +12,8 @@ import { notFound } from "next/navigation";
 import { Suspense } from "react";
 import LinkInspectorCard from "./card";
 
-export const runtime = "edge";
+// nodejs runtime: the self-hosted deployment runs everything on Node
+export const runtime = "nodejs";
 
 export async function generateMetadata(props: {
   params: Promise<{ domain: string; key: string }>;

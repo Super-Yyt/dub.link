@@ -1,13 +1,11 @@
-import { Client } from "@planetscale/database";
-import { PrismaPlanetScale } from "@prisma/adapter-planetscale";
 import { PrismaClient } from "@prisma/client";
 
-const client = new Client({
-  url: process.env.PLANETSCALE_DATABASE_URL || process.env.DATABASE_URL,
-});
-
-const adapter = new PrismaPlanetScale(client);
-
-export const prismaEdge = new PrismaClient({
-  adapter,
-});
+/**
+ * Prisma client for edge/middleware contexts.
+ *
+ * Previously this used the @prisma/adapter-planetscale HTTP driver so it
+ * could run on Vercel's edge runtime. The self-hosted deployment runs the
+ * middleware in the Node.js runtime against PostgreSQL, so a regular
+ * PrismaClient is used directly.
+ */
+export const prismaEdge = new PrismaClient();

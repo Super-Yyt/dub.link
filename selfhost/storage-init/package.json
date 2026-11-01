@@ -1,0 +1,14 @@
+{
+  "name": "dub-selfhost-storage-init",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Creates S3 buckets (and public-read policy) on the local RustFS/S3 endpoint",
+  "type": "module",
+  "main": "src/init.mjs",
+  "scripts": {
+    "start": "node src/init.mjs"
+  },
+  "dependencies": {
+    "aws4fetch": "^1.0.20"
+  }
+}

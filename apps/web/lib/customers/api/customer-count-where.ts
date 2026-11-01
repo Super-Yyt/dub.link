@@ -29,9 +29,11 @@ export function buildCustomerSearchWhere({
   if (search.includes("@")) return { email: search };
 
   const q = sanitizeFullTextSearch(search);
+  // MySQL full-text `search` filter replaced with case-insensitive
+  // `contains`, which works on both MySQL and PostgreSQL
   return {
-    email: { search: q },
-    name: { search: q },
+    email: { contains: q },
+    name: { contains: q },
   };
 }
 

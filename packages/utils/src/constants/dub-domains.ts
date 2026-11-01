@@ -131,6 +131,27 @@ export const DUB_DOMAINS = [
       "Branded domain for Figma links (portfolios, prototypes, presentations, etc.).",
     projectId: DUB_WORKSPACE_ID,
   },
+  // Self-hosted deployments can expose their own shared link domains via
+  // NEXT_PUBLIC_SELFHOST_DOMAINS (comma-separated, e.g. "dub.localhost").
+  // The matching verified Domain rows must exist in the database (the
+  // selfhost seed script creates them).
+  ...(
+    (process.env.NEXT_PUBLIC_SELFHOST_DOMAINS || "")
+      .split(",")
+      .map((d) => d.trim())
+      .filter(Boolean)
+      .map((slug, i) => ({
+        id: "selfhost-domain-" + i,
+        slug,
+        verified: true,
+        primary: false,
+        archived: false,
+        placeholder: "",
+        allowedHostnames: [],
+        description: "Self-hosted shared domain",
+        projectId: DUB_WORKSPACE_ID,
+      }))
+  ),
 ];
 
 export const DUB_DOMAINS_ARRAY = DUB_DOMAINS.map((domain) => domain.slug);

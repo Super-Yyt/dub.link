@@ -64,8 +64,8 @@ export const GET = withAxiom(async (req) => {
       where: {
         integrationId: APPSFLYER_INTEGRATION_ID,
         settings: {
-          path: "$.appIds",
-          array_contains: appId,
+          path: ["$.appIds"], // array form is required on PostgreSQL, accepted on MySQL
+          array_contains: [appId],
         },
       },
       select: {

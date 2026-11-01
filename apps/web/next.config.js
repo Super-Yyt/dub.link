@@ -18,11 +18,9 @@ console.warn = (...args) => {
 };
 
 /** @type {import('next').NextConfig} */
-module.exports = withPlausibleProxy({
-  src: "https://plausible.io/js/pa-T9BPIqC3D0XQFZnP1vHfN.js",
-  scriptPath: "/_proxy/plausible/script.js",
-  apiPath: "/_proxy/plausible/event",
-})({
+// The Plausible analytics proxy is only enabled when configured; this keeps
+// self-hosted deployments from loading third-party scripts from plausible.io.
+const nextConfig = {
   reactStrictMode: false,
   transpilePackages: [
     "prettier",
@@ -140,7 +138,9 @@ module.exports = withPlausibleProxy({
         missing: [
           {
             type: "host",
-            value: ".*(\\.dub\\.co|localhost)",
+            // dub.co hosts, localhost, and single-label container hostnames
+            // (e.g. the docker-network service name "web") all serve the API
+            value: ".*(\\.dub\\.co|localhost|^[^.]+$)",
           },
         ],
         destination: "/",
@@ -185,4 +185,14 @@ module.exports = withPlausibleProxy({
       },
     ];
   },
-});
+  // Standalone server output for Docker deployments
+  output: process.env.NEXT_OUTPUT_STANDALONE === "1" ? "standalone" : undefined,
+};
+
+module.exports = process.env.NEXT_PUBLIC_PLAUSIBLE_SCRIPT_URL
+  ? withPlausibleProxy({
+      src: process.env.NEXT_PUBLIC_PLAUSIBLE_SCRIPT_URL,
+      scriptPath: "/_proxy/plausible/script.js",
+      apiPath: "/_proxy/plausible/event",
+    })(nextConfig)
+  : nextConfig;

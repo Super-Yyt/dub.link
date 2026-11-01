@@ -1,0 +1,11 @@
+{
+  "name": "dub-selfhost-tinybird",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Tinybird-compatible analytics API backed by ClickHouse",
+  "type": "module",
+  "main": "src/index.mjs",
+  "scripts": {
+    "start": "node src/index.mjs"
+  }
+}

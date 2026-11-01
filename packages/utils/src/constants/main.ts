@@ -6,6 +6,11 @@ export const API_HOSTNAMES = new Set([
   `api.${SHORT_DOMAIN}`,
   "api.localhost:8888",
   "api.localhost",
+  ...(process.env.NEXT_PUBLIC_APP_HOSTNAMES || "")
+    .split(",")
+    .map((h) => h.trim())
+    .filter(Boolean)
+    .flatMap((h) => [h, `api.${h}`]),
 ]);
 
 export const API_DOMAIN =
@@ -29,12 +34,28 @@ export const APP_DOMAIN_WITH_NGROK =
       ? `https://${process.env.NEXT_PUBLIC_VERCEL_URL || "preview.dub.co"}`
       : process.env.NEXT_PUBLIC_NGROK_URL || "http://localhost:8888";
 
+// Additional hostnames that should be treated as the app host, useful for
+// self-hosted deployments where internal services (queues, schedulers)
+// reach the app via its docker-network hostname (e.g. "web:3000").
+const EXTRA_APP_HOSTNAMES = new Set(
+  (process.env.NEXT_PUBLIC_APP_HOSTNAMES || "")
+    .split(",")
+    .map((h) => h.trim())
+    .filter(Boolean),
+);
+
 export const isAppHostname = (hostname: string) => {
   if (process.env.NEXT_PUBLIC_VERCEL_ENV === "preview") {
     // pattern of our preview URLs are always "dub-<random-string>.dub.co"
     return hostname.startsWith("dub-") && hostname.endsWith(".dub.co");
   }
-  return new Set(["app.dub.co", "localhost:8888", "localhost"]).has(hostname);
+  return (
+    new Set(["app.dub.co", "localhost:8888", "localhost"]).has(hostname) ||
+    EXTRA_APP_HOSTNAMES.has(hostname) ||
+    // single-label hostnames (e.g. "web", "web:3000") only exist inside
+    // container networks, where requests always target the app itself
+    !hostname.split(":")[0].includes(".")
+  );
 };
 
 export const DUB_LOGO = "https://assets.dub.co/logo.png";

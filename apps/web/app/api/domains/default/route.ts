@@ -40,6 +40,17 @@ export const GET = withWorkspace(
         );
     }
 
+    // Self-hosted shared domains (see NEXT_PUBLIC_SELFHOST_DOMAINS) are
+    // always available, without a per-workspace DefaultDomains row.
+    const selfhostDomains = (process.env.SELFHOST_DOMAINS || "")
+      .split(",")
+      .map((d) => d.trim())
+      .filter(Boolean)
+      .filter((d) =>
+        search ? d.toLowerCase().includes(search.toLowerCase()) : true,
+      );
+    defaultDomains = [...new Set([...selfhostDomains, ...defaultDomains])];
+
     return NextResponse.json(defaultDomains);
   },
   {

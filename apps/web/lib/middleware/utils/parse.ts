@@ -1,4 +1,3 @@
-import { isAppHostname, SHORT_DOMAIN } from "@dub/utils";
 import { NextRequest } from "next/server";
 import { DOMAIN_REDIRECTS } from "./domain-redirects";
 
@@ -10,27 +9,17 @@ export const parse = (req: NextRequest) => {
   // remove www. from domain and convert to lowercase
   domain = domain.replace(/^www./, "").toLowerCase();
 
+  // self-hosted deployments often serve on a non-standard port
+  // (e.g. dub.localhost:8888); link domains are stored without the port,
+  // so strip it before doing any domain lookups
+  domain = domain.replace(/:\d+$/, "");
+
   if (DOMAIN_REDIRECTS[domain]) {
     domain = DOMAIN_REDIRECTS[domain];
   }
 
-  const isE2ERedirectTestRequest =
-    // local development
-    domain === "dub.localhost:8888" ||
-    // preview environment
-    (process.env.VERCEL_ENV === "preview" &&
-      isAppHostname(domain) &&
-      req.headers.get("x-e2e-redirect-test") === "true");
-
-  if (isE2ERedirectTestRequest) {
-    if (path.toLowerCase() === "/case-sensitive-test") {
-      // special case for case-sensitive link test
-      domain = "dub-internal-test.com";
-    } else {
-      // for local development and preview URLs
-      domain = SHORT_DOMAIN;
-    }
-  }
+  // (the upstream Playwright e2e hack for dub.localhost:8888 is not needed
+  // here: self-hosted stacks serve real domains from the database)
 
   // fullPath is the full URL path (along with search params)
   const searchParams = req.nextUrl.searchParams.toString();

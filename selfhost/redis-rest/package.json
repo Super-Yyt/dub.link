@@ -1,0 +1,14 @@
+{
+  "name": "dub-selfhost-redis-rest",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Upstash Redis REST API compatible proxy backed by a local Redis/Valkey server",
+  "type": "module",
+  "main": "src/index.mjs",
+  "scripts": {
+    "start": "node src/index.mjs"
+  },
+  "dependencies": {
+    "ioredis": "^5.4.1"
+  }
+}
