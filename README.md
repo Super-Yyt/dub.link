@@ -8,7 +8,7 @@
 > 一条命令跑起完整的 Dub 短链平台，零外部 SaaS、数据 100% 留在本机。
 > Run the entire Dub link-management stack with one command - no external SaaS, all data stays on your machine.
 
-这是一个基于 dubinc/dub 的社区分支（AGPL-3.0，遵循上游协议开源），
+这是 [Super-Yyt/dub.link](https://github.com/Super-Yyt/dub.link) —— 基于 [dubinc/dub](https://github.com/dubinc/dub) 的社区分支（AGPL-3.0，遵循上游协议开源），
 把上游依赖的全部云服务替换为了本地组件。完整文档见 [selfhost/README.md](selfhost/README.md)。
 
 ## 快速开始 (Quick Start)
