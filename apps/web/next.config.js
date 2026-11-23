@@ -45,6 +45,9 @@ const nextConfig = {
     serverActions: {
       bodySizeLimit: "4mb",
     },
+    // low-memory-friendly builds (self-hosted servers / small CI runners)
+    webpackMemoryOptimizations: true,
+    cpus: Math.max(1, Math.min(4, Number(process.env.BUILD_CPUS) || 2)),
   },
   webpack: (config, { webpack, isServer }) => {
     if (isServer) {

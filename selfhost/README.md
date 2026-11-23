@@ -60,6 +60,24 @@ docker compose --env-file .env.selfhost up -d --build
 - 生产环境：把 `SELFHOST_DOMAINS` 设为你的真实域名（如 `go.example.com`），DNS A 记录指向本机，所有工作台共享该域名；用户也可以在界面里添加自己拥有的自定义域名。
 - `NEXTAUTH_URL` 必须是用户浏览器可访问的地址（默认 `http://localhost:8888`）。
 
+## 低内存服务器部署（镜像版）
+
+Next.js 构建峰值约需 3GB 内存，小服务器会 OOM（exit 137）。仓库提供两条出路：
+
+1. 预构建镜像（推荐）：GitHub Actions 已自动构建并推送镜像到 GHCR。使用镜像版编排文件，部署机完全不需要跑 Next.js 构建：
+
+       docker compose -f docker-compose.images.yml --env-file .env.selfhost up -d
+
+   注意 NEXT_PUBLIC_* 是构建时固化的：要让 SELFHOST_DOMAINS 出现在前端域名下拉里，在仓库 Settings -> Secrets and variables -> Actions -> Variables 添加 SELFHOST_DOMAINS 变量后，手动触发 "Build & Publish Images" 工作流重新出镜像。
+
+2. 服务器加 swap 后原地构建（构建较慢但可行）：
+
+       sudo fallocate -l 4G /swapfile && sudo chmod 600 /swapfile
+       sudo mkswap /swapfile && sudo swapon /swapfile
+       # 然后重新部署；完成后可 swapoff 并删掉 swapfile
+
+构建侧已做的低内存优化：webpackMemoryOptimizations、限制静态生成并发、NODE_OPTIONS 堆上限 4GB。
+
 ## 常用操作
 
 ```bash

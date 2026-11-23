@@ -1,0 +1,262 @@
+# Dub self-hosted stack - PRE-BUILT IMAGES variant
+#
+# Uses the web/migrate images published by GitHub Actions to GHCR, so the
+# deployment machine never needs the heavy Next.js build (~3GB RAM peak).
+# Small helper services (redis-rest, qstash, tinybird, cron, storage-init)
+# are still built locally - they are tiny.
+#
+# Usage:
+#   docker compose -f docker-compose.images.yml --env-file .env.selfhost up -d
+#
+# NOTE: NEXT_PUBLIC_* values are baked at image build time. To make your
+# SELFHOST_DOMAINS appear in the frontend domain picker, set the repo
+# variable SELFHOST_DOMAINS (Settings -> Secrets and variables -> Actions
+# -> Variables) and re-run the "Build & Publish Images" workflow.
+
+# Dub — fully self-hosted stack (PostgreSQL edition)
+#
+# One command to start everything:
+#   cp .env.selfhost.example .env.selfhost && docker compose --env-file .env.selfhost up -d
+#
+# All services run locally: PostgreSQL, Valkey (Redis), a QStash-compatible
+# queue, a Tinybird-compatible analytics API on ClickHouse, MinIO (S3),
+# Mailpit (SMTP), a cron scheduler and the Dub web app itself.
+# No data ever leaves the machine.
+
+name: dub-selfhost
+
+services:
+  # ------------------------------------------------------------- databases
+  postgres:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-dub}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-dub}
+      POSTGRES_DB: ${POSTGRES_DB:-dub}
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-dub} -d ${POSTGRES_DB:-dub}"]
+      interval: 5s
+      timeout: 5s
+      retries: 12
+
+  valkey:
+    image: valkey/valkey:8-alpine
+    restart: unless-stopped
+    volumes:
+      - valkey-data:/data
+    healthcheck:
+      test: ["CMD", "valkey-cli", "ping"]
+      interval: 5s
+      timeout: 5s
+      retries: 12
+
+  clickhouse:
+    image: clickhouse/clickhouse-server:24.8-alpine
+    restart: unless-stopped
+    environment:
+      CLICKHOUSE_USER: ${CLICKHOUSE_USER:-dub}
+      CLICKHOUSE_PASSWORD: ${CLICKHOUSE_PASSWORD:-dub}
+    ulimits:
+      nofile:
+        soft: 262144
+        hard: 262144
+    volumes:
+      - clickhouse-data:/var/lib/clickhouse
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://127.0.0.1:8123/ping"]
+      interval: 5s
+      timeout: 5s
+      retries: 12
+
+  # S3-compatible object storage. MinIO images no longer allow anonymous
+  # pulls, so the default uses RustFS (also S3-compatible). Set STORAGE_*
+  # in .env.selfhost to point the app at any external S3 instead and stop
+  # this service.
+  rustfs:
+    image: rustfs/rustfs:latest
+    restart: unless-stopped
+    environment:
+      RUSTFS_ACCESS_KEY: ${STORAGE_ACCESS_KEY_ID:-dub}
+      RUSTFS_SECRET_KEY: ${STORAGE_SECRET_ACCESS_KEY:-dubsecret}
+    volumes:
+      - rustfs-data:/data
+    ports:
+      - "${STORAGE_PORT:-9000}:9000"
+      - "${STORAGE_CONSOLE_PORT:-9001}:9001"
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost:9000/minio/health/live"]
+      interval: 5s
+      timeout: 5s
+      retries: 12
+
+  storage-init:
+    build:
+      context: .
+      dockerfile: selfhost/storage-init/Dockerfile
+      args:
+        NPM_REGISTRY: ${NPM_REGISTRY:-https://registry.npmjs.org}
+    restart: "no"
+    environment:
+      STORAGE_ENDPOINT: http://rustfs:9000
+      STORAGE_ACCESS_KEY_ID: ${STORAGE_ACCESS_KEY_ID:-dub}
+      STORAGE_SECRET_ACCESS_KEY: ${STORAGE_SECRET_ACCESS_KEY:-dubsecret}
+      STORAGE_PUBLIC_BUCKET: ${STORAGE_PUBLIC_BUCKET:-dub-public}
+      STORAGE_PRIVATE_BUCKET: ${STORAGE_PRIVATE_BUCKET:-dub-private}
+    depends_on:
+      rustfs:
+        condition: service_healthy
+
+  mailpit:
+    image: axllent/mailpit:latest
+    restart: unless-stopped
+    ports:
+      - "${MAILPIT_UI_PORT:-8025}:8025"
+
+  # --------------------------------------------- compatible service layers
+  redis-rest:
+    build:
+      context: .
+      dockerfile: selfhost/redis-rest/Dockerfile
+      args:
+        NPM_REGISTRY: ${NPM_REGISTRY:-https://registry.npmjs.org}
+    restart: unless-stopped
+    environment:
+      REDIS_URL: redis://valkey:6379
+      REDIS_REST_TOKEN: ${REDIS_REST_TOKEN:-selfhost-redis-token}
+    depends_on:
+      valkey:
+        condition: service_healthy
+
+  qstash:
+    build:
+      context: .
+      dockerfile: selfhost/qstash/Dockerfile
+    restart: unless-stopped
+    environment:
+      QSTASH_TOKEN: ${QSTASH_TOKEN:-selfhost-qstash-token}
+      QSTASH_CURRENT_SIGNING_KEY: ${QSTASH_CURRENT_SIGNING_KEY:-selfhost-current-signing-key}
+      QSTASH_NEXT_SIGNING_KEY: ${QSTASH_NEXT_SIGNING_KEY:-selfhost-next-signing-key}
+      DATA_DIR: /data
+    volumes:
+      - qstash-data:/data
+
+  tinybird:
+    build:
+      context: .
+      dockerfile: selfhost/tinybird/Dockerfile
+    restart: unless-stopped
+    environment:
+      CLICKHOUSE_URL: http://clickhouse:8123
+      CLICKHOUSE_USER: ${CLICKHOUSE_USER:-dub}
+      CLICKHOUSE_PASSWORD: ${CLICKHOUSE_PASSWORD:-dub}
+      TINYBIRD_API_KEY: ${TINYBIRD_API_KEY:-selfhost-tinybird-token}
+    depends_on:
+      clickhouse:
+        condition: service_healthy
+
+  # ------------------------------------------------------- app + migration
+  migrate:
+    # pre-built image from GHCR (GitHub Actions), no local build needed
+    image: ghcr.io/super-yyt/dub-migrate:latest
+    restart: "no"
+    environment:
+      DATABASE_URL: postgres://${POSTGRES_USER:-dub}:${POSTGRES_PASSWORD:-dub}@postgres:5432/${POSTGRES_DB:-dub}
+      SELFHOST_DOMAINS: ${SELFHOST_DOMAINS:-}
+    working_dir: /repo/apps/web
+    command:
+      - sh
+      - -c
+      - |
+        echo "[migrate] pushing prisma schema to postgres..."
+        ./node_modules/.bin/prisma db push --schema=./prisma/schema --skip-generate
+        echo "[migrate] seeding selfhost domains..."
+        node scripts/selfhost/seed.mjs
+        echo "[migrate] done"
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  web:
+    # pre-built image from GHCR (GitHub Actions), no local build needed
+    image: ghcr.io/super-yyt/dub-web:latest
+    restart: unless-stopped
+    ports:
+      - "${WEB_PORT:-8888}:3000"
+    environment:
+      # database (PostgreSQL)
+      DATABASE_URL: postgres://${POSTGRES_USER:-dub}:${POSTGRES_PASSWORD:-dub}@postgres:5432/${POSTGRES_DB:-dub}
+      # auth
+      NEXTAUTH_URL: ${NEXTAUTH_URL:-http://localhost:8888}
+      NEXTAUTH_SECRET: ${NEXTAUTH_SECRET:-dev-nextauth-secret-change-me}
+      ENCRYPTION_KEY: ${ENCRYPTION_KEY:-kWDKZlpOWmhUFkUgx7DXuJaYZ/N1d/N2nXBBkgTQooY=}
+      CRON_SECRET: ${CRON_SECRET:-dev-cron-secret-change-me}
+      # redis (Upstash-compatible REST proxy over Valkey)
+      UPSTASH_REDIS_REST_URL: http://redis-rest:8079
+      UPSTASH_REDIS_REST_TOKEN: ${REDIS_REST_TOKEN:-selfhost-redis-token}
+      # background jobs (QStash-compatible queue).
+      # NOTE: the app publishes callbacks under this URL, so it must be
+      # reachable from the queue container, hence the in-network hostname.
+      NEXT_PUBLIC_NGROK_URL: http://web:3000
+      QSTASH_URL: http://qstash:8103
+      QSTASH_TOKEN: ${QSTASH_TOKEN:-selfhost-qstash-token}
+      QSTASH_CURRENT_SIGNING_KEY: ${QSTASH_CURRENT_SIGNING_KEY:-selfhost-current-signing-key}
+      QSTASH_NEXT_SIGNING_KEY: ${QSTASH_NEXT_SIGNING_KEY:-selfhost-next-signing-key}
+      # analytics (Tinybird-compatible API over ClickHouse)
+      TINYBIRD_API_URL: http://tinybird:7181
+      TINYBIRD_API_KEY: ${TINYBIRD_API_KEY:-selfhost-tinybird-token}
+      # email (SMTP via Mailpit)
+      SMTP_HOST: mailpit
+      SMTP_PORT: "1025"
+      SMTP_USER: ${SMTP_USER:-smtpUser}
+      SMTP_PASSWORD: ${SMTP_PASSWORD:-smtpPassword}
+      # object storage (MinIO, S3-compatible)
+      STORAGE_ACCESS_KEY_ID: ${STORAGE_ACCESS_KEY_ID:-dub}
+      STORAGE_SECRET_ACCESS_KEY: ${STORAGE_SECRET_ACCESS_KEY:-dubsecret}
+      STORAGE_ENDPOINT: ${STORAGE_INTERNAL_ENDPOINT:-http://rustfs:9000}
+      STORAGE_BASE_URL: ${STORAGE_BASE_URL:-http://localhost:9000}
+      STORAGE_PUBLIC_BUCKET: ${STORAGE_PUBLIC_BUCKET:-dub-public}
+      STORAGE_PRIVATE_BUCKET: ${STORAGE_PRIVATE_BUCKET:-dub-private}
+      # shared link domains served by this instance
+      SELFHOST_DOMAINS: ${SELFHOST_DOMAINS:-}
+      # in-network hostname(s) the middleware should treat as the app host
+      NEXT_PUBLIC_APP_HOSTNAMES: ${SELFHOST_APP_HOSTNAMES:-web:3000}
+    depends_on:
+      postgres:
+        condition: service_healthy
+      valkey:
+        condition: service_healthy
+      clickhouse:
+        condition: service_healthy
+      redis-rest:
+        condition: service_started
+      qstash:
+        condition: service_started
+      tinybird:
+        condition: service_started
+      mailpit:
+        condition: service_started
+      migrate:
+        condition: service_completed_successfully
+
+  cron:
+    build:
+      context: .
+      dockerfile: selfhost/cron/Dockerfile
+    restart: unless-stopped
+    environment:
+      WEB_URL: http://web:3000
+      CRON_SECRET: ${CRON_SECRET:-dev-cron-secret-change-me}
+      CRON_JOBS: ${CRON_JOBS:-}
+    depends_on:
+      web:
+        condition: service_started
+
+volumes:
+  postgres-data:
+  valkey-data:
+  clickhouse-data:
+  rustfs-data:
+  qstash-data:

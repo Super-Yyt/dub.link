@@ -26,7 +26,7 @@ ENV NEXT_PUBLIC_SELFHOST_DOMAINS=$NEXT_PUBLIC_SELFHOST_DOMAINS \
     NEXT_PUBLIC_PLAUSIBLE_DOMAIN=$NEXT_PUBLIC_PLAUSIBLE_DOMAIN \
     NEXT_OUTPUT_STANDALONE=1 \
     NODE_ENV=production \
-    NODE_OPTIONS=--max-old-space-size=6144
+    NODE_OPTIONS=--max-old-space-size=4096
 
 # prisma generate does not need a reachable database
 ENV DATABASE_URL="postgresql://build:build@localhost:5432/build"
