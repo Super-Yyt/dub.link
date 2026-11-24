@@ -205,9 +205,10 @@ services:
       # analytics (Tinybird-compatible API over ClickHouse)
       TINYBIRD_API_URL: http://tinybird:7181
       TINYBIRD_API_KEY: ${TINYBIRD_API_KEY:-selfhost-tinybird-token}
-      # email (SMTP via Mailpit)
-      SMTP_HOST: mailpit
-      SMTP_PORT: "1025"
+      # email: defaults to the local Mailpit inbox; set SMTP_HOST/PORT/
+      # USER/PASSWORD in .env.selfhost to use a real mail provider instead
+      SMTP_HOST: ${SMTP_HOST:-mailpit}
+      SMTP_PORT: "${SMTP_PORT:-1025}"
       SMTP_USER: ${SMTP_USER:-smtpUser}
       SMTP_PASSWORD: ${SMTP_PASSWORD:-smtpPassword}
       # object storage (MinIO, S3-compatible)
