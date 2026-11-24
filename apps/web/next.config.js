@@ -141,9 +141,10 @@ const nextConfig = {
         missing: [
           {
             type: "host",
-            // dub.co hosts, localhost, and single-label container hostnames
-            // (e.g. the docker-network service name "web") all serve the API
-            value: ".*(\\.dub\\.co|localhost|^[^.]+$)",
+            // Self-hosted deployments serve the API on every hostname
+            // bound to the app. (The upstream dub.co/localhost allowlist
+            // would 307 real domains back to "/" and break /api/auth.)
+            value: ".*",
           },
         ],
         destination: "/",
